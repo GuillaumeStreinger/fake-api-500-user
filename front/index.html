@@ -1,0 +1,208 @@
+<!doctype html>
+<html class="no-js" lang="fr">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mon site</title>
+  <meta name="description" content="">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <script>
+      let searchTerms = [];
+      let allUsers = [];
+      let usersDisplayed = 0;
+      let isTableView = false;
+
+      async function getUserList(page, terms = []) {
+          const response = await fetch(`/user/${page}`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ terms })
+          });
+          const data = await response.json();
+          allUsers = data.data;
+          usersDisplayed = 0;
+          displayUsers();
+      }
+
+      function addSearchTerm(term) {
+          if (term.trim() && !searchTerms.includes(term)) {
+              searchTerms.push(term);
+              updateSearchBar();
+              getUserList(1, searchTerms);
+          }
+      }
+
+      function removeSearchTerm(term) {
+          searchTerms = searchTerms.filter(t => t !== term);
+          updateSearchBar();
+          getUserList(1, searchTerms);
+      }
+
+      function updateSearchBar() {
+          const searchBar = document.getElementById('searchBar');
+          searchBar.innerHTML = '';
+
+          const termContainer = document.createElement('div');
+          termContainer.className = 'flex flex-wrap items-center';
+
+          searchTerms.forEach(term => {
+              const termElement = document.createElement('div');
+              termElement.className = 'bg-gray-200 text-gray-800 rounded-full px-4 py-2 m-1 inline-flex items-center';
+              termElement.innerHTML = `
+                  ${term}
+                  <button class="ml-2" onclick="removeSearchTerm('${term}')">
+                      <i class="fa fa-times text-red-500"></i>
+                  </button>
+              `;
+              termContainer.appendChild(termElement);
+          });
+
+          const inputContainer = document.createElement('div');
+          inputContainer.className = 'flex items-center flex-grow';
+
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.id = 'searchInput';
+          input.className = 'flex-1 border-none outline-none p-2 m-1';
+          input.placeholder = searchTerms.length ? '' : 'Recherche utilisateurs';
+          input.onkeypress = (e) => {
+              if (e.key === 'Enter') {
+                  addSearchTerm(e.target.value);
+                  e.target.value = '';
+              }
+          };
+
+          const searchButton = document.createElement('button');
+          searchButton.className = 'ml-2 bg-blue-500 text-white rounded p-2';
+          searchButton.innerHTML = '<i class="fa fa-search"></i>';
+          searchButton.onclick = () => {
+              addSearchTerm(input.value);
+              input.value = '';
+          };
+
+          inputContainer.appendChild(input);
+          inputContainer.appendChild(searchButton);
+
+          searchBar.appendChild(termContainer);
+          searchBar.appendChild(inputContainer);
+      }
+
+      function displayUsers() {
+          const userList = document.getElementById('userList');
+          userList.innerHTML = '';
+
+          const usersToDisplay = allUsers.slice(0, usersDisplayed + 6);
+          usersDisplayed = usersToDisplay.length;
+
+          if (Array.isArray(usersToDisplay) && usersToDisplay.length > 0) {
+              if (isTableView) {
+                  const table = document.createElement('table');
+                  table.className = 'justify-center items-center w-full bg-white';
+                  table.innerHTML = `
+                      <thead>
+                          <tr>
+                              <th class="py-2 px-4 border">Picture</th>
+                              <th class="py-2 px-4 border">Name</th>
+                              <th class="py-2 px-4 border">Job</th>
+                              <th class="py-2 px-4 border">Email</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                      ${usersToDisplay.map((user, index) => `
+                          <tr class="${index % 2 === 0 ? 'bg-gray-100' : 'bg-gray-300'}">
+                              <td class="border px-4 py-2"><img class="h-16 w-16 object-cover" src="${user.imageUrl}" alt="Image of ${user.firstName} ${user.lastName}"></td>
+                              <td class="border px-4 py-2">${user.firstName} ${user.lastName}</td>
+                              <td class="border px-4 py-2">${user.jobTitle}</td>
+                              <td class="border px-4 py-2">${user.email}</td>
+                          </tr>
+                      `).join('')}
+                      </tbody>
+                  `;
+                  userList.appendChild(table);
+
+                  if (usersDisplayed < allUsers.length) {
+                      const loadMoreRow = document.createElement('tr');
+                      const loadMoreCell = document.createElement('td');
+                      loadMoreCell.colSpan = 4;
+                      loadMoreCell.className = 'border px-4 py-2 text-center';
+                      const loadMoreButton = document.createElement('button');
+                      loadMoreButton.className = 'text-xl font-semibold text-blue-500';
+                      loadMoreButton.innerText = 'Load More';
+                      loadMoreButton.onclick = loadMoreUsers;
+
+                      loadMoreCell.appendChild(loadMoreButton);
+                      loadMoreRow.appendChild(loadMoreCell);
+                      table.querySelector('tbody').appendChild(loadMoreRow);
+                  }
+              } else {
+                  userList.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 w-full';
+
+                  usersToDisplay.forEach(user => {
+                      const userElement = document.createElement('div');
+                      userElement.className = 'bg-white shadow-lg rounded-lg overflow-hidden p-4 mb-4 transition-transform transform hover:scale-105 hover:shadow-xl';
+                      userElement.innerHTML = `
+                          <img class="w-full h-48 object-cover" src="${user.imageUrl}" alt="Image of ${user.firstName} ${user.lastName}">
+                          <h2 class="text-xl font-semibold text-gray-800 mt-4">${user.firstName} ${user.lastName}</h2>
+                          <p class="mt-2 text-lg text-gray-600">${user.jobTitle}</p>
+                          <p class="mt-2 text-lg text-gray-600">${user.email}</p>
+                      `;
+                      userList.appendChild(userElement);
+                  });
+
+                  if (usersDisplayed < allUsers.length) {
+                      const loadMoreElement = document.createElement('div');
+                      loadMoreElement.className = 'bg-white shadow-lg rounded-lg overflow-hidden p-4 mb-4 flex items-center justify-center cursor-pointer';
+                      loadMoreElement.innerHTML = `
+                          <button class="text-xl font-semibold text-blue-500">Load More</button>
+                      `;
+                      loadMoreElement.addEventListener('click', loadMoreUsers);
+                      userList.appendChild(loadMoreElement);
+                  }
+              }
+          } else {
+              userList.innerHTML = '<p class="text-gray-600">No users found</p>';
+          }
+      }
+
+      function loadMoreUsers() {
+          usersDisplayed += 6;
+          displayUsers();
+      }
+
+      function switchToGridView() {
+          isTableView = false;
+          displayUsers();
+      }
+
+      function switchToTableView() {
+          isTableView = true;
+          displayUsers();
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+          updateSearchBar();
+          getUserList(1);
+      });
+  </script>
+</head>
+
+<body class="flex flex-col items-center bg-gray-100 p-8 w-full min-h-screen">
+    <div class="w-full mb-8 flex justify-between items-center">
+        <div id="searchBar" class="relative flex items-center border border-gray-300 rounded p-2 w-full"></div>
+        <div class="flex space-x-4 ml-4">
+            <button onclick="switchToGridView()" class="bg-gray-500 text-white px-4 py-2 rounded">
+                <i class="fas fa-th"></i>
+            </button>
+            <button onclick="switchToTableView()" class="bg-gray-500 text-white px-4 py-2 rounded">
+                <i class="fas fa-list"></i>
+            </button>
+        </div>
+    </div>
+    <div id="userList" class="flex flex-col items-center w-full min-h-full"></div>
+</body>
+
+</html>
